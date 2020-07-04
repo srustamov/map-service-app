@@ -1,4 +1,4 @@
-import 'package:Geolocation/pages/main.dart';
+import 'package:Geolocation/pages/main_page.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
 
@@ -10,10 +10,7 @@ class Application extends StatelessWidget {
     return MaterialApp(
       title: 'Geo Location',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        brightness: Brightness.dark,
-        primaryColor: Colors.red,
-      ),
+      theme: ThemeData.dark(),
       darkTheme: ThemeData(
         brightness: Brightness.dark,
       ),

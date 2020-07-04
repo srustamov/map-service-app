@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:background_location/background_location.dart';
 import 'package:android_multiple_identifier/android_multiple_identifier.dart';
-import 'package:flutter/services.dart';
 import 'package:socket_io_client/socket_io_client.dart' as IO;
 import 'package:flutter/material.dart';
 
@@ -16,7 +15,8 @@ class MainPage extends StatefulWidget {
 }
 
 class _MainPagePageState extends State{
-  Map _idMap = Map();
+  Map _deviceInfo = Map();
+
   IO.Socket socket;
 
   String latitude = "waiting...";
@@ -58,7 +58,6 @@ class _MainPagePageState extends State{
         });
       },
       onDenied: () {
-
         exit(0);
       },
     );
@@ -68,9 +67,9 @@ class _MainPagePageState extends State{
     Map allData = {};
 
     Map infoData = {
-      'id': _idMap['androidId'],
-      'imei': _idMap['imei'],
-      'serial': _idMap['serial'],
+      'id': _deviceInfo['androidId'],
+      'imei': _deviceInfo['imei'],
+      'serial': _deviceInfo['serial'],
     };
 
     allData.addAll(infoData);
@@ -90,16 +89,16 @@ class _MainPagePageState extends State{
   Future<void> initIdentifierInfo() async {
     Map idMap;
 
-    // Platform messages may fail, so we use a try/catch PlatformException.
-    try {
-      String platformVersion = await AndroidMultipleIdentifier.platformVersion;
-    } on PlatformException {
-      String platformVersion = 'Failed to get platform version.';
-    }
+//    try {
+//      String platformVersion = await AndroidMultipleIdentifier.platformVersion;
+//    } on PlatformException {
+//      String platformVersion = 'Failed to get platform version.';
+//    }
 
     bool requestResponse = await AndroidMultipleIdentifier.requestPermission();
-
-    print("NEVER ASK AGAIN SET TO: ${AndroidMultipleIdentifier.neverAskAgain}");
+    if(!requestResponse) {
+      exit(0);
+    }
 
     try {
       idMap = await AndroidMultipleIdentifier.idMap;
@@ -113,7 +112,7 @@ class _MainPagePageState extends State{
     if (!mounted) return;
 
     setState(() {
-      _idMap = idMap;
+      _deviceInfo = idMap;
     });
   }
 
@@ -121,7 +120,7 @@ class _MainPagePageState extends State{
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Geoloaction'),
+        title: Text('Geolocation'),
         backgroundColor: Colors.deepOrange,
       ),
       body: Center(
@@ -133,8 +132,8 @@ class _MainPagePageState extends State{
               crossAxisAlignment: CrossAxisAlignment.center,
               mainAxisSize: MainAxisSize.max,
               children: <Widget>[
-                locationData("IMEI", _idMap["imei"]),
-                locationData("SERIAL", _idMap["serial"]),
+                locationData("IMEI", _deviceInfo["imei"]),
+                locationData("SERIAL", _deviceInfo["serial"]),
                 locationData("Latitude",latitude),
                 locationData("Longitude ", longitude),
                 Row(
@@ -173,8 +172,12 @@ class _MainPagePageState extends State{
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => BackgroundLocation().getCurrentLocation(),
-        child: Icon(Icons.gps_fixed),
+        child: Icon(
+          Icons.gps_fixed,
+          color: Colors.white,
+        ),
         backgroundColor: Colors.green,
+
       ),
     );
   }
