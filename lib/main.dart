@@ -1,10 +1,14 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/services.dart';
-import 'package:device_info/device_info.dart';
-import 'package:location/location.dart';
+
+//import 'package:location/location.dart';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
+
+//import 'package:http/http.dart' as http;
+import 'package:background_location/background_location.dart';
+import 'package:android_multiple_identifier/android_multiple_identifier.dart';
+import 'package:socket_io_client/socket_io_client.dart' as IO;
 
 void main() => runApp(Application());
 
@@ -14,10 +18,6 @@ class Application extends StatelessWidget {
     return MaterialApp(
       title: 'Geo Location',
       debugShowCheckedModeBanner: false,
-//      theme: ThemeData(
-//        primarySwatch: Colors.blue,
-//        visualDensity: VisualDensity.adaptivePlatformDensity,
-//      ),
       theme: ThemeData(
         brightness: Brightness.light,
         primaryColor: Colors.red,
@@ -40,105 +40,124 @@ class MainPage extends StatefulWidget {
 }
 
 class _MainPagePageState extends State<MainPage> {
-  static final DeviceInfoPlugin deviceInfoPlugin = DeviceInfoPlugin();
-  Map<String, dynamic> _deviceData = <String, dynamic>{};
+  Map _idMap = Map();
+  IO.Socket socket;
+
+  String latitude = "waiting...";
+  String longitude = "waiting...";
+  String altitude = "waiting...";
+  String accuracy = "waiting...";
+  String bearing = "waiting...";
+  String speed = "waiting...";
+  String time = "waiting...";
 
   @override
   void initState() {
     super.initState();
-    initPlatformState();
-    var location = new Location();
 
-    location.onLocationChanged().listen((data) {
-      if (data != null) {
-        sendData(data);
-      }
+    socket = IO.io('https://abb68ab3b211.ngrok.io', <String, dynamic>{
+      'transports': ['websocket'],
     });
-  }
 
-  void sendData(LocationData data) async {
-    await http.post(
-      'https://abb68ab3b211.ngrok.io/location',
-      headers: <String, String> {
-        'Content-Type': 'application/json; charset=UTF-8',
+    initIdentifierInfo();
+//    var location = new Location();
+//
+//    location.onLocationChanged().listen((data) {
+//      if (data != null) {
+//        sendData(data);
+//      }
+//    });
+
+    BackgroundLocation.getPermissions(
+      onGranted: () {
+        BackgroundLocation.startLocationService();
+        BackgroundLocation.getLocationUpdates((location) {
+          setState(() {
+            this.latitude = location.latitude.toString();
+            this.longitude = location.longitude.toString();
+            this.accuracy = location.accuracy.toString();
+            this.altitude = location.altitude.toString();
+            this.bearing = location.bearing.toString();
+            this.speed = location.speed.toString();
+            this.time =
+                DateTime.fromMillisecondsSinceEpoch(location.time.toInt())
+                    .toString();
+          });
+
+          if (location != null) {
+            sendData(location);
+          }
+        });
       },
-      body: json.encode({
-        'id': _deviceData['androidId'],
-        'lathitude': data.latitude,
-        'longitude': data.longitude,
-      }),
+      onDenied: () {
+
+        exit(0);
+      },
     );
   }
 
-  Future<void> initPlatformState() async {
-    Map<String, dynamic> deviceData;
+  void sendData(location) async {
+    Map allData = {};
+
+    Map infoData = {
+      'id': _idMap['androidId'],
+      'imei': _idMap['imei'],
+      'serial': _idMap['serial'],
+    };
+
+    allData.addAll(infoData);
+    allData.addAll({
+      'latitude': 40.4631193,//location.latitude.toString(),
+      'longitude': 50.0493061,//location.longitude.toString(),
+      'accuracy': location.accuracy.toString(),
+      'altitude': location.altitude.toString(),
+      'bearing': location.bearing.toString(),
+      'speed': location.speed.toString(),
+      'time':
+          DateTime.fromMillisecondsSinceEpoch(location.time.toInt()).toString()
+    });
+    socket.emit('make-location', json.encode(allData));
+//    await http.post(
+//      'https://abb68ab3b211.ngrok.io/location',
+//      headers: <String, String> {
+//        'Content-Type': 'application/json; charset=UTF-8',
+//      },
+//      body: json.encode({
+//        'id': _idMap['androidId'],
+//        'imei' : _idMap['imei'],
+//        'serial' : _idMap['serial'],
+//        'lathitude': data.latitude,
+//        'longitude': data.longitude,
+//      }),
+//    );
+  }
+
+  Future<void> initIdentifierInfo() async {
+    Map idMap;
+
+    // Platform messages may fail, so we use a try/catch PlatformException.
+    try {
+      String platformVersion = await AndroidMultipleIdentifier.platformVersion;
+    } on PlatformException {
+      String platformVersion = 'Failed to get platform version.';
+    }
+
+    bool requestResponse = await AndroidMultipleIdentifier.requestPermission();
+    print("NEVER ASK AGAIN SET TO: ${AndroidMultipleIdentifier.neverAskAgain}");
 
     try {
-      if (Platform.isAndroid) {
-        deviceData = _readAndroidBuildData(await deviceInfoPlugin.androidInfo);
-      } else if (Platform.isIOS) {
-        deviceData = _readIosDeviceInfo(await deviceInfoPlugin.iosInfo);
-      }
-    } on PlatformException {
-      deviceData = <String, dynamic>{
-        'Error:': 'Failed to get platform version.'
-      };
+      idMap = await AndroidMultipleIdentifier.idMap;
+    } catch (e) {
+      idMap = Map();
+      idMap["imei"] = 'Unknown IMEI.';
+      idMap["serial"] = 'Unknown Serial Code.';
+      idMap["androidId"] = 'Unknown';
     }
 
     if (!mounted) return;
-
     setState(() {
-      _deviceData = deviceData;
+      _idMap = idMap;
     });
-  }
-
-  Map<String, dynamic> _readAndroidBuildData(AndroidDeviceInfo build) {
-    return <String, dynamic>{
-      'version.securityPatch': build.version.securityPatch,
-      'version.sdkInt': build.version.sdkInt,
-      'version.release': build.version.release,
-      'version.previewSdkInt': build.version.previewSdkInt,
-      'version.incremental': build.version.incremental,
-      'version.codename': build.version.codename,
-      'version.baseOS': build.version.baseOS,
-      'board': build.board,
-      'bootloader': build.bootloader,
-      'brand': build.brand,
-      'device': build.device,
-      'display': build.display,
-      'fingerprint': build.fingerprint,
-      'hardware': build.hardware,
-      'host': build.host,
-      'id': build.id,
-      'manufacturer': build.manufacturer,
-      'model': build.model,
-      'product': build.product,
-      'supported32BitAbis': build.supported32BitAbis,
-      'supported64BitAbis': build.supported64BitAbis,
-      'supportedAbis': build.supportedAbis,
-      'tags': build.tags,
-      'type': build.type,
-      'isPhysicalDevice': build.isPhysicalDevice,
-      'androidId': build.androidId,
-      'systemFeatures': build.systemFeatures,
-    };
-  }
-
-  Map<String, dynamic> _readIosDeviceInfo(IosDeviceInfo data) {
-    return <String, dynamic>{
-      'name': data.name,
-      'systemName': data.systemName,
-      'systemVersion': data.systemVersion,
-      'model': data.model,
-      'localizedModel': data.localizedModel,
-      'identifierForVendor': data.identifierForVendor,
-      'isPhysicalDevice': data.isPhysicalDevice,
-      'utsname.sysname:': data.utsname.sysname,
-      'utsname.nodename:': data.utsname.nodename,
-      'utsname.release:': data.utsname.release,
-      'utsname.version:': data.utsname.version,
-      'utsname.machine:': data.utsname.machine,
-    };
   }
 
   @override
@@ -148,32 +167,23 @@ class _MainPagePageState extends State<MainPage> {
         appBar: AppBar(
           title: Text(Platform.isAndroid ? 'Android Device' : 'iOS Device'),
         ),
-        body: ListView(
-          children: _deviceData.keys.map((String property) {
-            return Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        body: Center(
+          heightFactor: MediaQuery.of(context).size.height,
+          child: Container(
+            margin: const EdgeInsets.all(30.0),
+            padding: const EdgeInsets.all(10.0),
+            decoration: BoxDecoration(
+              border: Border.all(),
+            ),
+            width: MediaQuery.of(context).size.width,
+            height: MediaQuery.of(context).size.height,
+            child: Column(
               children: <Widget>[
-                Container(
-                  padding: const EdgeInsets.all(10.0),
-                  child: Text(
-                    "$property :",
-                    style: const TextStyle(
-                        fontWeight: FontWeight.bold, fontSize: 15),
-                  ),
-                ),
-                Expanded(
-                  child: Container(
-                    padding: const EdgeInsets.fromLTRB(0.0, 10.0, 0.0, 10.0),
-                    child: Text(
-                      '${_deviceData[property]}',
-                      maxLines: 10,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ),
+                Text('IMEI:${_idMap["imei"]}'),
+                Text('SERIAL:${_idMap["serial"]}'),
               ],
-            );
-          }).toList(),
+            ),
+          ),
         ),
       ),
     );
