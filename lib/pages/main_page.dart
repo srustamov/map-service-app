@@ -5,6 +5,9 @@ import 'package:android_multiple_identifier/android_multiple_identifier.dart';
 import 'package:socket_io_client/socket_io_client.dart' as IO;
 import 'package:flutter/material.dart';
 
+//const  SOCKET_URL = 'https://abb68ab3b211.ngrok.io';
+const  SOCKET_URL = 'http://192.168.1.102:3000';
+
 class MainPage extends StatefulWidget {
   MainPage({Key key, this.title}) : super(key: key);
 
@@ -15,44 +18,34 @@ class MainPage extends StatefulWidget {
 }
 
 class _MainPagePageState extends State{
-  Map _deviceInfo = Map();
 
+  Map _deviceInfo = Map();
   IO.Socket socket;
 
-  String latitude = "waiting...";
-  String longitude = "waiting...";
-  String altitude = "waiting...";
-  String accuracy = "waiting...";
-  String bearing = "waiting...";
-  String speed = "waiting...";
-  String time = "waiting...";
+  String latitude  = "";
+  String longitude = "";
+
 
   @override
   void initState() {
     super.initState();
-
-    socket = IO.io('https://abb68ab3b211.ngrok.io', <String, dynamic>{
+    socket = IO.io(SOCKET_URL, <String, dynamic>{
       'transports': ['websocket'],
     });
-
     initIdentifierInfo();
+    startBackgroundLocationService();
+  }
 
-
+  void startBackgroundLocationService() {
     BackgroundLocation.getPermissions(
       onGranted: () {
         BackgroundLocation.startLocationService();
         BackgroundLocation.getLocationUpdates((location) {
-          setState(() {
-            this.latitude = location.latitude.toString();
-            this.longitude = location.longitude.toString();
-            this.accuracy = location.accuracy.toString();
-            this.altitude = location.altitude.toString();
-            this.bearing = location.bearing.toString();
-            this.speed = location.speed.toString();
-            this.time = DateTime.fromMillisecondsSinceEpoch(location.time.toInt()).toString();
-          });
-
           if (location != null) {
+            setState(() {
+              this.latitude = location.latitude.toString();
+              this.longitude = location.longitude.toString();
+            });
             sendData(location);
           }
         });
@@ -64,36 +57,22 @@ class _MainPagePageState extends State{
   }
 
   void sendData(location) async {
-    Map allData = {};
 
-    Map infoData = {
+    Map data = {};
+
+    data.addAll(location.toMap());
+
+    data.addAll({
       'id': _deviceInfo['androidId'],
       'imei': _deviceInfo['imei'],
       'serial': _deviceInfo['serial'],
-    };
-
-    allData.addAll(infoData);
-    allData.addAll({
-      'latitude':location.latitude.toString(),
-      'longitude':location.longitude.toString(),
-      'accuracy': location.accuracy.toString(),
-      'altitude': location.altitude.toString(),
-      'bearing': location.bearing.toString(),
-      'speed': location.speed.toString(),
-      'time':
-      DateTime.fromMillisecondsSinceEpoch(location.time.toInt()).toString()
     });
-    socket.emit('make-location', json.encode(allData));
+
+    socket.emit('make-location', json.encode(data));
   }
 
   Future<void> initIdentifierInfo() async {
     Map idMap;
-
-//    try {
-//      String platformVersion = await AndroidMultipleIdentifier.platformVersion;
-//    } on PlatformException {
-//      String platformVersion = 'Failed to get platform version.';
-//    }
 
     bool requestResponse = await AndroidMultipleIdentifier.requestPermission();
     if(!requestResponse) {
@@ -182,7 +161,6 @@ class _MainPagePageState extends State{
     );
   }
 
-
   Widget locationData(String name,value) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -198,7 +176,7 @@ class _MainPagePageState extends State{
           textAlign: TextAlign.start,
         ),
         Text(
-          value,
+          value.toString(),
           style: TextStyle(
               fontWeight: FontWeight.bold,
               fontSize: 18,
