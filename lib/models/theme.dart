@@ -1,10 +1,7 @@
-
-
 import 'package:flutter/material.dart';
 
-class ThemeCustomData
+class ThemeModel
 {
-
   final darkTheme = ThemeData(
     primarySwatch: Colors.grey,
     primaryColor: Colors.black,
@@ -24,19 +21,4 @@ class ThemeCustomData
     accentIconTheme: IconThemeData(color: Colors.white),
     dividerColor: Colors.white54,
   );
-
-}
-
-class ThemeNotifier with ChangeNotifier
-{
-  ThemeData _themeData;
-
-  ThemeNotifier(this._themeData);
-
-  getTheme() => _themeData;
-
-  setTheme(ThemeData themeData) async {
-    _themeData = themeData;
-    notifyListeners();
-  }
 }

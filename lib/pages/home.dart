@@ -1,7 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
 import 'dart:async';
-import 'package:Geolocation/providers/theme_provider.dart';
+import 'package:Geolocation/blocs/theme_bloc.dart';
+import 'package:Geolocation/models/theme.dart';
 import 'package:background_location/background_location.dart';
 import 'package:android_multiple_identifier/android_multiple_identifier.dart';
 import 'package:provider/provider.dart';
@@ -11,16 +12,16 @@ import 'package:connectivity/connectivity.dart';
 import 'package:vibration/vibration.dart';
 import 'package:http/http.dart' as http;
 
-class MainPage extends StatefulWidget {
-  MainPage({Key key, this.title}) : super(key: key);
+class HomePage extends StatefulWidget {
+  HomePage({Key key, this.title}) : super(key: key);
 
   final String title;
 
   @override
-  createState() => _MainPageState();
+  createState() => _HomePageState();
 }
 
-class _MainPageState extends State {
+class _HomePageState extends State {
   bool _isPrepare = true;
   Timer _notificationTimer;
   String _notification = '';
@@ -34,15 +35,9 @@ class _MainPageState extends State {
 
   bool _locationServiceStatus = false;
 
-  bool _isDarkTheme = false;
-
   @override
   Widget build(BuildContext context) {
-    final themeNotifier = Provider.of<ThemeNotifier>(context);
-
-    setState(() {
-      _isDarkTheme = themeNotifier.getTheme() == ThemeCustomData().darkTheme;
-    });
+    final ThemeBloc themeBloc = Provider.of<ThemeBloc>(context);
 
     return Scaffold(
       appBar: AppBar(
@@ -51,16 +46,13 @@ class _MainPageState extends State {
         actions: <Widget>[
             FlatButton(
               onPressed: () {
-                if(_isDarkTheme) {
-                  themeNotifier.setTheme(ThemeCustomData().lightTheme);
+                if(themeBloc.isDarkTheme()) {
+                  themeBloc.setTheme(ThemeModel().lightTheme);
                 } else {
-                  themeNotifier.setTheme(ThemeCustomData().darkTheme);
+                  themeBloc.setTheme(ThemeModel().darkTheme);
                 }
-                setState(() {
-                  _isDarkTheme = !_isDarkTheme;
-                });
               },
-              child: Icon(_isDarkTheme ? Icons.brightness_7 : Icons.brightness_4),
+              child: Icon(themeBloc.isDarkTheme() ? Icons.brightness_7 : Icons.brightness_4),
             )
         ],
       ),
