@@ -1,12 +1,15 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:async';
+import 'package:Geolocation/providers/theme_provider.dart';
 import 'package:background_location/background_location.dart';
 import 'package:android_multiple_identifier/android_multiple_identifier.dart';
+import 'package:provider/provider.dart';
 import 'package:socket_io_client/socket_io_client.dart' as IO;
 import 'package:flutter/material.dart';
-
-//const  SOCKET_URL = 'https://abb68ab3b211.ngrok.io';
-const  SOCKET_URL = 'http://192.168.1.102:3000';
+import 'package:connectivity/connectivity.dart';
+import 'package:vibration/vibration.dart';
+import 'package:http/http.dart' as http;
 
 class MainPage extends StatefulWidget {
   MainPage({Key key, this.title}) : super(key: key);
@@ -14,32 +17,217 @@ class MainPage extends StatefulWidget {
   final String title;
 
   @override
-  _MainPagePageState createState() => _MainPagePageState();
+  createState() => _MainPageState();
 }
 
-class _MainPagePageState extends State{
-
+class _MainPageState extends State {
+  bool _isPrepare = true;
+  Timer _notificationTimer;
+  String _notification = '';
+  bool _notificationVibrate = false;
   Map _deviceInfo = Map();
   IO.Socket socket;
+  String socketUrl = '';
 
-  String latitude  = "";
+  String latitude = "";
   String longitude = "";
 
+  bool _locationServiceStatus = false;
+
+  bool _isDarkTheme = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final themeNotifier = Provider.of<ThemeNotifier>(context);
+
+    setState(() {
+      _isDarkTheme = themeNotifier.getTheme() == ThemeCustomData().darkTheme;
+    });
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('Geolocation'),
+        backgroundColor: Colors.green,
+        actions: <Widget>[
+            FlatButton(
+              onPressed: () {
+                if(_isDarkTheme) {
+                  themeNotifier.setTheme(ThemeCustomData().lightTheme);
+                } else {
+                  themeNotifier.setTheme(ThemeCustomData().darkTheme);
+                }
+                setState(() {
+                  _isDarkTheme = !_isDarkTheme;
+                });
+              },
+              child: Icon(_isDarkTheme ? Icons.brightness_7 : Icons.brightness_4),
+            )
+        ],
+      ),
+      body: LayoutBuilder(
+        builder: (context, constraint) {
+          return SingleChildScrollView(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: constraint.maxHeight),
+              child:Container(
+                width:constraint.maxWidth ,
+                child: _isPrepare
+                    ? Center(child: CircularProgressIndicator(),)
+                    : Container(
+                  padding: EdgeInsets.all(8.0),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    mainAxisSize: MainAxisSize.max,
+                    children: <Widget>[
+                      notificationBanner(),
+                      Row(
+                        mainAxisSize: MainAxisSize.max,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: <Widget>[
+                          Text('Vibrate'),
+                          Switch(
+                            value: _notificationVibrate,
+                            onChanged: (value) {
+                              setState(() {
+                                _notificationVibrate = value;
+                              });
+                              if(value) {
+                                putVibrate();
+                              }
+                            },
+                            activeTrackColor: Colors.lightGreenAccent,
+                            activeColor: Colors.green,
+                          )
+                        ],
+                      ),
+                      locationData("IMEI", _deviceInfo["imei"]),
+                      locationData("Latitude", latitude),
+                      locationData("Longitude ", longitude),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        mainAxisSize: MainAxisSize.max,
+                        children: <Widget>[
+                          !_locationServiceStatus ? RawMaterialButton(
+                              elevation: 10.0,
+                              fillColor: Colors.teal,
+                              onPressed: () async {
+                                await BackgroundLocation
+                                    .startLocationService();
+                                socket.connect();
+                                setState(() {
+                                  _locationServiceStatus = true;
+                                });
+                              },
+                              padding: EdgeInsets.all(25.0),
+                              shape: CircleBorder(),
+                              child: Text("Start",style: TextStyle(color: Colors.white))
+                          )
+                          : RawMaterialButton(
+                              padding: EdgeInsets.all(25.0),
+                              elevation: 10.0,
+                              fillColor: Colors.red,
+                              onPressed: () {
+                                BackgroundLocation.stopLocationService();
+                                socket.disconnect();
+                                setState(() {
+                                  latitude = '';
+                                  longitude = '';
+                                });
+                                setState(() {
+                                  _locationServiceStatus = false;
+                                });
+                              },
+                              shape: CircleBorder(),
+                              child: Text("Stop",style: TextStyle(color: Colors.white),)),
+                        ],
+                      )
+                    ],
+                  ),
+                ),
+              )
+            ),
+          );
+        },
+      ),
+
+//      floatingActionButton: FloatingActionButton(
+//        onPressed: () => BackgroundLocation().getCurrentLocation(),
+//        child: Icon(
+//          Icons.gps_fixed,
+//          color: Colors.white,
+//        ),
+//        backgroundColor: Colors.green,
+//      ),
+    );
+  }
 
   @override
   void initState() {
     super.initState();
-    socket = IO.io(SOCKET_URL, <String, dynamic>{
+    Connectivity().checkConnectivity().then((value) {
+      if (value == ConnectivityResult.none) {
+        showAlertDialog('Check internet connection');
+      } else {
+        prepareApp();
+      }
+    });
+  }
+
+  void putVibrate() {
+    if(_notificationVibrate) {
+      Vibration.hasVibrator().then((value) => Vibration.vibrate());
+    }
+  }
+
+  void prepareApp() {
+    if (socketUrl.isEmpty) {
+      http.get('https://support.edi.az/geo.php').then((value) {
+        if (value.statusCode == 200) {
+          setState(() {
+            socketUrl = value.body;
+          });
+          initBaseServices();
+        }
+      });
+    } else {
+      initBaseServices();
+    }
+  }
+
+  void initBaseServices() {
+    socket = IO.io(socketUrl, <String, dynamic>{
       'transports': ['websocket'],
     });
+
+    socket.on('notification', (data) {
+      setState(() {
+        _notification = data;
+      });
+      _notificationTimer.cancel();
+      _notificationTimer = new Timer(const Duration(seconds: 5), () {
+        putVibrate();
+        setState(() {
+          _notification = '';
+        });
+      });
+    });
+
     initIdentifierInfo();
     startBackgroundLocationService();
+    setState(() {
+      _isPrepare = false;
+    });
   }
 
   void startBackgroundLocationService() {
     BackgroundLocation.getPermissions(
       onGranted: () {
         BackgroundLocation.startLocationService();
+        setState(() {
+          _locationServiceStatus = true;
+        });
         BackgroundLocation.getLocationUpdates((location) {
           if (location != null) {
             setState(() {
@@ -56,26 +244,11 @@ class _MainPagePageState extends State{
     );
   }
 
-  void sendData(location) async {
-
-    Map data = {};
-
-    data.addAll(location.toMap());
-
-    data.addAll({
-      'id': _deviceInfo['androidId'],
-      'imei': _deviceInfo['imei'],
-      'serial': _deviceInfo['serial'],
-    });
-
-    socket.emit('make-location', json.encode(data));
-  }
-
   Future<void> initIdentifierInfo() async {
     Map idMap;
 
     bool requestResponse = await AndroidMultipleIdentifier.requestPermission();
-    if(!requestResponse) {
+    if (!requestResponse) {
       exit(0);
     }
 
@@ -95,73 +268,73 @@ class _MainPagePageState extends State{
     });
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Geolocation'),
-        backgroundColor: Colors.deepOrange,
-      ),
-      body: Center(
-          heightFactor: MediaQuery.of(context).size.height,
-          child: Container(
-            padding: EdgeInsets.all(8.0),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              crossAxisAlignment: CrossAxisAlignment.center,
-              mainAxisSize: MainAxisSize.max,
-              children: <Widget>[
-                locationData("IMEI", _deviceInfo["imei"]),
-                locationData("SERIAL", _deviceInfo["serial"]),
-                locationData("Latitude",latitude),
-                locationData("Longitude ", longitude),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  mainAxisSize: MainAxisSize.max,
-                  children: <Widget>[
-                    FlatButton(
-                        color: Colors.indigo,
-                        textColor: Colors.white,
-                        onPressed: () async {
-                          await BackgroundLocation.startLocationService();
-                          socket.connect();
-                        },
-                        child: Text("Start Location Service")
-                    ),
-                    FlatButton(
-                        color: Colors.red,
-                        textColor: Colors.white,
-                        onPressed: () {
-                          BackgroundLocation.stopLocationService();
-                          socket.disconnect();
-                          setState(() {
-                            latitude = '';
-                            longitude = '';
-                          });
-                        },
-                        child: Text("Stop Location Service")
-                    ),
-                  ],
-                )
+  showAlertDialog(String message) {
+    putVibrate();
+    showDialog(
+        context: context,
+        builder: (_) => AlertDialog(
+              backgroundColor: Colors.blueAccent,
+              elevation: 20.0,
+              title: Text(message),
+              actions: <Widget>[
+                FlatButton(
+                  onPressed: () => exit(0),
+                  child: Text(
+                    'exit',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                ),
+              ],
+            ),
+        barrierDismissible: true);
+  }
 
+  void sendData(location) async {
+    Map data = {};
+
+    data.addAll(location.toMap());
+
+    data.addAll({
+      'id': _deviceInfo['androidId'],
+      'imei': _deviceInfo['imei'],
+      'serial': _deviceInfo['serial'],
+    });
+
+    socket.emit('make-location', json.encode(data));
+  }
+
+  Widget notificationBanner() {
+    return _notification.isNotEmpty
+        ? Container(
+            padding: EdgeInsets.all(5.0),
+            color: Colors.pink,
+            child: Row(
+              mainAxisSize: MainAxisSize.max,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: <Widget>[
+                Text(
+                  _notification.toString(),
+                  style: TextStyle(color: Colors.white),
+                ),
+                FlatButton(
+                  onPressed: () {
+                    setState(() {
+                      _notification = '';
+                    });
+                  },
+                  child: Icon(
+                    Icons.close,
+                    color: Colors.white,
+                  ),
+                )
               ],
             ),
           )
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => BackgroundLocation().getCurrentLocation(),
-        child: Icon(
-          Icons.gps_fixed,
-          color: Colors.white,
-        ),
-        backgroundColor: Colors.green,
-
-      ),
-    );
+        : Container();
   }
 
-  Widget locationData(String name,value) {
+  Widget locationData(String name, value) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       crossAxisAlignment: CrossAxisAlignment.center,
@@ -180,12 +353,10 @@ class _MainPagePageState extends State{
           style: TextStyle(
               fontWeight: FontWeight.bold,
               fontSize: 18,
-              color: Colors.purpleAccent
-          ),
+              color: Colors.purpleAccent),
           textAlign: TextAlign.end,
         ),
       ],
     );
-
   }
 }

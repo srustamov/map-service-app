@@ -12,10 +12,14 @@ dependencies:
   flutter:
     sdk: flutter
 
+  provider: any
+  http: any
   location: ^2.5.4
   background_location: ^0.1.0
   flutter_launcher_icons: ^0.7.3
   android_multiple_identifier: ^1.0.3
+  connectivity: ^0.4.9
+  vibration: ^1.4.0
   socket_io_client: ^0.9.10
   cupertino_icons: ^0.1.3
 
