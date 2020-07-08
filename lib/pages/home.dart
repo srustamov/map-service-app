@@ -2,9 +2,10 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:async';
 import 'package:Geolocation/blocs/theme_bloc.dart';
+import 'package:Geolocation/components/home.dart';
 import 'package:Geolocation/models/theme.dart';
+import 'package:Geolocation/services/device_info.dart';
 import 'package:background_location/background_location.dart';
-import 'package:android_multiple_identifier/android_multiple_identifier.dart';
 import 'package:provider/provider.dart';
 import 'package:socket_io_client/socket_io_client.dart' as IO;
 import 'package:flutter/material.dart';
@@ -22,7 +23,7 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State {
-  bool _isPrepare = true;
+  bool loading = true;
   Timer _notificationTimer;
   String _notification = '';
   bool _notificationVibrate = false;
@@ -42,116 +43,147 @@ class _HomePageState extends State {
     return Scaffold(
       appBar: AppBar(
         title: Text('Geolocation'),
-        backgroundColor: Colors.green,
+        backgroundColor: Colors.orange,
         actions: <Widget>[
-            FlatButton(
-              onPressed: () {
-                if(themeBloc.isDarkTheme()) {
-                  themeBloc.setTheme(ThemeModel().lightTheme);
-                } else {
-                  themeBloc.setTheme(ThemeModel().darkTheme);
-                }
-              },
-              child: Icon(themeBloc.isDarkTheme() ? Icons.brightness_7 : Icons.brightness_4),
-            )
+          FlatButton(
+            onPressed: () {
+              if (themeBloc.isDarkTheme()) {
+                themeBloc.setTheme(ThemeModel().lightTheme);
+              } else {
+                themeBloc.setTheme(ThemeModel().darkTheme);
+              }
+            },
+            child: Icon(themeBloc.isDarkTheme()
+                ? Icons.brightness_7
+                : Icons.brightness_4),
+          )
         ],
       ),
       body: LayoutBuilder(
         builder: (context, constraint) {
           return SingleChildScrollView(
             child: ConstrainedBox(
-              constraints: BoxConstraints(minHeight: constraint.maxHeight),
-              child:Container(
-                width:constraint.maxWidth ,
-                child: _isPrepare
-                    ? Center(child: CircularProgressIndicator(),)
-                    : Container(
-                  padding: EdgeInsets.all(8.0),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    mainAxisSize: MainAxisSize.max,
-                    children: <Widget>[
-                      notificationBanner(),
-                      Row(
-                        mainAxisSize: MainAxisSize.max,
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: <Widget>[
-                          Text('Vibrate'),
-                          Switch(
-                            value: _notificationVibrate,
-                            onChanged: (value) {
-                              setState(() {
-                                _notificationVibrate = value;
-                              });
-                              if(value) {
-                                putVibrate();
-                              }
-                            },
-                            activeTrackColor: Colors.lightGreenAccent,
-                            activeColor: Colors.green,
-                          )
-                        ],
-                      ),
-                      locationData("IMEI", _deviceInfo["imei"]),
-                      locationData("Latitude", latitude),
-                      locationData("Longitude ", longitude),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        mainAxisSize: MainAxisSize.max,
-                        children: <Widget>[
-                          !_locationServiceStatus ? RawMaterialButton(
-                              elevation: 10.0,
-                              fillColor: Colors.teal,
-                              onPressed: () async {
-                                await BackgroundLocation
-                                    .startLocationService();
-                                socket.connect();
-                                setState(() {
-                                  _locationServiceStatus = true;
-                                });
-                              },
-                              padding: EdgeInsets.all(25.0),
-                              shape: CircleBorder(),
-                              child: Text("Start",style: TextStyle(color: Colors.white))
-                          )
-                          : RawMaterialButton(
-                              padding: EdgeInsets.all(25.0),
-                              elevation: 10.0,
-                              fillColor: Colors.red,
-                              onPressed: () {
-                                BackgroundLocation.stopLocationService();
-                                socket.disconnect();
-                                setState(() {
-                                  latitude = '';
-                                  longitude = '';
-                                });
-                                setState(() {
-                                  _locationServiceStatus = false;
-                                });
-                              },
-                              shape: CircleBorder(),
-                              child: Text("Stop",style: TextStyle(color: Colors.white),)),
-                        ],
-                      )
-                    ],
-                  ),
-                ),
-              )
-            ),
+                constraints: BoxConstraints(minHeight: constraint.maxHeight),
+                child: Container(
+                  width: constraint.maxWidth,
+                  child: loading
+                      ? showLoading(text: 'Preparing...')
+                      : Container(
+                          padding: EdgeInsets.all(8.0),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            mainAxisSize: MainAxisSize.max,
+                            children: <Widget>[
+                              notificationBanner(),
+                              showData("IMEI", _deviceInfo["imei"]),
+                              showData("Latitude", latitude),
+                              showData("Longitude ", longitude),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                mainAxisSize: MainAxisSize.max,
+                                children: <Widget>[
+                                  !_locationServiceStatus
+                                      ? RawMaterialButton(
+                                          elevation: 20.0,
+                                          fillColor: Colors.teal,
+                                          onPressed: () async {
+                                            setState(() {
+                                              loading = true;
+                                            });
+
+                                            await BackgroundLocation.startLocationService();
+                                            socket.connect();
+                                            await wait(10);
+                                            setState(() {
+                                              _locationServiceStatus = true;
+                                              loading = false;
+                                            });
+                                          },
+                                          padding: EdgeInsets.all(20.0),
+                                          shape: CircleBorder(),
+                                          child: Icon(Icons.my_location,size: 50.0,),
+                                        )
+                                      : RawMaterialButton(
+                                          hoverElevation: 0,
+                                          padding: EdgeInsets.all(20.0),
+                                          elevation: 10.0,
+                                          fillColor: Colors.red,
+                                          onPressed: () {
+                                            setState(() {
+                                              loading = true;
+                                            });
+                                            BackgroundLocation
+                                                .stopLocationService();
+                                            socket.disconnect();
+                                            setState(() {
+                                              latitude = '';
+                                              longitude = '';
+                                            });
+                                            setState(() {
+                                              _locationServiceStatus = false;
+                                              loading = false;
+                                            });
+                                          },
+                                          shape: RoundedRectangleBorder(
+                                              borderRadius: BorderRadius.circular(50.0),
+                                            ),
+                                          child: Text(
+                                            "STOP",
+                                            style: TextStyle(
+                                              color: Colors.white,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ),
+                                ],
+                              )
+                            ],
+                          ),
+                        ),
+                )),
           );
         },
       ),
-
-//      floatingActionButton: FloatingActionButton(
-//        onPressed: () => BackgroundLocation().getCurrentLocation(),
-//        child: Icon(
-//          Icons.gps_fixed,
-//          color: Colors.white,
-//        ),
-//        backgroundColor: Colors.green,
-//      ),
+      drawer: Drawer(
+        child: ListView(
+          children: <Widget>[
+            SizedBox(
+              height: 20.0,
+            ),
+            Card(
+              elevation: 15.0,
+              child: ListTile(
+                onTap: () {
+                  setState(() {
+                    _notificationVibrate = !_notificationVibrate;
+                  });
+                },
+                leading: Icon(Icons.vibration),
+                title: Text(
+                  'Vibration',
+                  style: TextStyle(fontSize: 18.0, fontWeight: FontWeight.bold),
+                ),
+                trailing: Switch(
+                  value: _notificationVibrate,
+                  onChanged: (value) {
+                    setState(() {
+                      _notificationVibrate = value;
+                    });
+                    if (value) {
+                      putVibrate();
+                    }
+                  },
+                  activeTrackColor: Colors.lightGreenAccent,
+                  activeColor: Colors.green,
+                ),
+                enabled: true,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -168,10 +200,11 @@ class _HomePageState extends State {
   }
 
   void putVibrate() {
-    if(_notificationVibrate) {
+    if (_notificationVibrate) {
       Vibration.hasVibrator().then((value) => Vibration.vibrate());
     }
   }
+
 
   void prepareApp() {
     if (socketUrl.isEmpty) {
@@ -197,7 +230,7 @@ class _HomePageState extends State {
       setState(() {
         _notification = data;
       });
-      _notificationTimer.cancel();
+      _notificationTimer?.cancel();
       _notificationTimer = new Timer(const Duration(seconds: 5), () {
         putVibrate();
         setState(() {
@@ -206,10 +239,13 @@ class _HomePageState extends State {
       });
     });
 
-    initIdentifierInfo();
-    startBackgroundLocationService();
-    setState(() {
-      _isPrepare = false;
+    //initIdentifierInfo();
+    DeviceInfo().init().then((info) {
+      _deviceInfo = info;
+      startBackgroundLocationService();
+      setState(() {
+        loading = false;
+      });
     });
   }
 
@@ -236,31 +272,7 @@ class _HomePageState extends State {
     );
   }
 
-  Future<void> initIdentifierInfo() async {
-    Map idMap;
-
-    bool requestResponse = await AndroidMultipleIdentifier.requestPermission();
-    if (!requestResponse) {
-      exit(0);
-    }
-
-    try {
-      idMap = await AndroidMultipleIdentifier.idMap;
-    } catch (e) {
-      idMap = Map();
-      idMap["imei"] = 'Unknown IMEI.';
-      idMap["serial"] = 'Unknown Serial Code.';
-      idMap["androidId"] = 'Unknown';
-    }
-
-    if (!mounted) return;
-
-    setState(() {
-      _deviceInfo = idMap;
-    });
-  }
-
-  showAlertDialog(String message) {
+  void showAlertDialog(String message) {
     putVibrate();
     showDialog(
         context: context,
@@ -283,9 +295,15 @@ class _HomePageState extends State {
 
   void sendData(location) async {
     Map data = {};
-
-    data.addAll(location.toMap());
-
+    data.addAll({
+      "latitude": location.latitude,
+      "longitude": location.longitude,
+      "altitude": location.altitude,
+      "accuracy": location.accuracy,
+      "bearing": location.bearing,
+      "speed": location.speed,
+      "time": location.time,
+    });
     data.addAll({
       'id': _deviceInfo['androidId'],
       'imei': _deviceInfo['imei'],
@@ -298,57 +316,47 @@ class _HomePageState extends State {
   Widget notificationBanner() {
     return _notification.isNotEmpty
         ? Container(
+            decoration: BoxDecoration(
+                border: Border.all(
+                  color: Colors.red,
+                  width: 1,
+                ),
+                borderRadius: BorderRadius.circular(12),
+                color: Colors.pink),
             padding: EdgeInsets.all(5.0),
-            color: Colors.pink,
             child: Row(
               mainAxisSize: MainAxisSize.max,
               crossAxisAlignment: CrossAxisAlignment.center,
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: <Widget>[
-                Text(
-                  _notification.toString(),
-                  style: TextStyle(color: Colors.white),
+                Expanded(
+                  child: Text(
+                    _notification.toString(),
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 17.0,
+                    ),
+                  ),
+
                 ),
-                FlatButton(
+                RawMaterialButton(
+                  padding: EdgeInsets.all(5.0),
+                  elevation: 10.0,
+                  fillColor: Colors.white,
                   onPressed: () {
                     setState(() {
                       _notification = '';
                     });
                   },
+                  shape: CircleBorder(),
                   child: Icon(
                     Icons.close,
-                    color: Colors.white,
+                    color: Colors.red,
                   ),
                 )
               ],
             ),
           )
         : Container();
-  }
-
-  Widget locationData(String name, value) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      crossAxisAlignment: CrossAxisAlignment.center,
-      mainAxisSize: MainAxisSize.max,
-      children: <Widget>[
-        Text(
-          name,
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 18,
-          ),
-          textAlign: TextAlign.start,
-        ),
-        Text(
-          value.toString(),
-          style: TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 18,
-              color: Colors.purpleAccent),
-          textAlign: TextAlign.end,
-        ),
-      ],
-    );
   }
 }
