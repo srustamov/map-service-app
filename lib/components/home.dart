@@ -8,7 +8,7 @@ Widget showData(String name, value) {
     ),
     color: Colors.black54,
     child: Padding(
-      padding: EdgeInsets.symmetric(horizontal: 10.0,vertical:50.0 ),
+      padding: EdgeInsets.symmetric(horizontal: 10.0, vertical: 50.0),
       child: Container(
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -18,18 +18,17 @@ Widget showData(String name, value) {
             Text(
               name,
               style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 18,
-                color: Colors.white
-              ),
+                  fontWeight: FontWeight.bold,
+                  fontSize: 18,
+                  color: Colors.white),
               textAlign: TextAlign.start,
             ),
             Text(
               value.toString(),
               style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 18,
-                  color: Colors.yellowAccent,
+                fontWeight: FontWeight.bold,
+                fontSize: 18,
+                color: Colors.yellowAccent,
               ),
               textAlign: TextAlign.end,
             ),
@@ -39,7 +38,6 @@ Widget showData(String name, value) {
     ),
   );
 }
-
 
 Widget showLoading({String text}) {
   return Center(
@@ -53,16 +51,12 @@ Widget showLoading({String text}) {
         ),
         Text(
           text,
-          style: TextStyle(
-              color: Colors.deepOrange,
-              fontSize: 20.0
-          ),
+          style: TextStyle(color: Colors.deepOrange, fontSize: 20.0),
         )
       ],
     ),
   );
 }
-
 
 Future wait(seconds) {
   Duration s = Duration(seconds: seconds);

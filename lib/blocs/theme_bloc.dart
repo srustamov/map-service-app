@@ -2,8 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:Geolocation/models/theme.dart';
 
-class ThemeBloc  extends ChangeNotifier
-{
+class ThemeBloc extends ChangeNotifier {
   ThemeData _themeData = ThemeModel().darkTheme;
 
   getTheme() => _themeData;
@@ -17,5 +16,3 @@ class ThemeBloc  extends ChangeNotifier
     return _themeData == ThemeModel().darkTheme;
   }
 }
-
-

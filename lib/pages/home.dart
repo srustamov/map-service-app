@@ -63,86 +63,92 @@ class _HomePageState extends State {
         builder: (context, constraint) {
           return SingleChildScrollView(
             child: ConstrainedBox(
-                constraints: BoxConstraints(minHeight: constraint.maxHeight),
-                child: Container(
-                  width: constraint.maxWidth,
-                  child: loading
-                      ? showLoading(text: 'Preparing...')
-                      : Container(
-                          padding: EdgeInsets.all(8.0),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            mainAxisSize: MainAxisSize.max,
-                            children: <Widget>[
-                              notificationBanner(),
-                              showData("IMEI", _deviceInfo["imei"]),
-                              showData("Latitude", latitude),
-                              showData("Longitude ", longitude),
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                crossAxisAlignment: CrossAxisAlignment.center,
-                                mainAxisSize: MainAxisSize.max,
-                                children: <Widget>[
-                                  !_locationServiceStatus
-                                      ? RawMaterialButton(
-                                          elevation: 20.0,
-                                          fillColor: Colors.teal,
-                                          onPressed: () async {
-                                            setState(() {
-                                              loading = true;
-                                            });
+              constraints: BoxConstraints(minHeight: constraint.maxHeight),
+              child: Container(
+                width: constraint.maxWidth,
+                child: loading
+                    ? showLoading(text: 'Preparing...')
+                    : Container(
+                        padding: EdgeInsets.all(8.0),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          mainAxisSize: MainAxisSize.max,
+                          children: <Widget>[
+                            notificationBanner(),
+                            showData("IMEI", _deviceInfo["imei"]),
+                            showData("Latitude", latitude),
+                            showData("Longitude ", longitude),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              mainAxisSize: MainAxisSize.max,
+                              children: <Widget>[
+                                !_locationServiceStatus
+                                    ? RawMaterialButton(
+                                        elevation: 20.0,
+                                        fillColor: Colors.teal,
+                                        onPressed: () async {
+                                          setState(() {
+                                            loading = true;
+                                          });
 
-                                            await BackgroundLocation.startLocationService();
-                                            socket.connect();
-                                            await wait(10);
-                                            setState(() {
-                                              _locationServiceStatus = true;
-                                              loading = false;
-                                            });
-                                          },
-                                          padding: EdgeInsets.all(20.0),
-                                          shape: CircleBorder(),
-                                          child: Icon(Icons.my_location,size: 50.0,),
-                                        )
-                                      : RawMaterialButton(
-                                          hoverElevation: 0,
-                                          padding: EdgeInsets.all(20.0),
-                                          elevation: 10.0,
-                                          fillColor: Colors.red,
-                                          onPressed: () {
-                                            setState(() {
-                                              loading = true;
-                                            });
-                                            BackgroundLocation
-                                                .stopLocationService();
-                                            socket.disconnect();
-                                            setState(() {
-                                              latitude = '';
-                                              longitude = '';
-                                            });
-                                            setState(() {
-                                              _locationServiceStatus = false;
-                                              loading = false;
-                                            });
-                                          },
-                                          shape: RoundedRectangleBorder(
-                                              borderRadius: BorderRadius.circular(50.0),
-                                            ),
-                                          child: Text(
-                                            "STOP",
-                                            style: TextStyle(
-                                              color: Colors.white,
-                                              fontWeight: FontWeight.bold,
-                                            ),
+                                          await BackgroundLocation
+                                              .startLocationService();
+                                          socket.connect();
+                                          await wait(10);
+                                          setState(() {
+                                            _locationServiceStatus = true;
+                                            loading = false;
+                                          });
+                                        },
+                                        padding: EdgeInsets.all(20.0),
+                                        shape: CircleBorder(),
+                                        child: Icon(
+                                          Icons.my_location,
+                                          size: 50.0,
+                                        ),
+                                      )
+                                    : RawMaterialButton(
+                                        hoverElevation: 0,
+                                        padding: EdgeInsets.all(20.0),
+                                        elevation: 10.0,
+                                        fillColor: Colors.red,
+                                        onPressed: () {
+                                          setState(() {
+                                            loading = true;
+                                          });
+                                          BackgroundLocation
+                                              .stopLocationService();
+                                          socket.disconnect();
+                                          setState(() {
+                                            latitude = '';
+                                            longitude = '';
+                                          });
+                                          setState(() {
+                                            _locationServiceStatus = false;
+                                            loading = false;
+                                          });
+                                        },
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(50.0),
+                                        ),
+                                        child: Text(
+                                          "STOP",
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.bold,
                                           ),
                                         ),
-                                ],
-                              )
-                            ],
-                          ),
+                                      ),
+                              ],
+                            )
+                          ],
                         ),
-                )),
+                      ),
+              ),
+            ),
           );
         },
       ),
@@ -204,7 +210,6 @@ class _HomePageState extends State {
       Vibration.hasVibrator().then((value) => Vibration.vibrate());
     }
   }
-
 
   void prepareApp() {
     if (socketUrl.isEmpty) {
@@ -275,22 +280,23 @@ class _HomePageState extends State {
   void showAlertDialog(String message) {
     putVibrate();
     showDialog(
-        context: context,
-        builder: (_) => AlertDialog(
-              backgroundColor: Colors.blueAccent,
-              elevation: 20.0,
-              title: Text(message),
-              actions: <Widget>[
-                FlatButton(
-                  onPressed: () => exit(0),
-                  child: Text(
-                    'exit',
-                    style: TextStyle(color: Colors.white),
-                  ),
-                ),
-              ],
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: Colors.blueAccent,
+        elevation: 20.0,
+        title: Text(message),
+        actions: <Widget>[
+          FlatButton(
+            onPressed: () => exit(0),
+            child: Text(
+              'exit',
+              style: TextStyle(color: Colors.white),
             ),
-        barrierDismissible: true);
+          ),
+        ],
+      ),
+      barrierDismissible: true,
+    );
   }
 
   void sendData(location) async {
@@ -317,12 +323,13 @@ class _HomePageState extends State {
     return _notification.isNotEmpty
         ? Container(
             decoration: BoxDecoration(
-                border: Border.all(
-                  color: Colors.red,
-                  width: 1,
-                ),
-                borderRadius: BorderRadius.circular(12),
-                color: Colors.pink),
+              border: Border.all(
+                color: Colors.red,
+                width: 1,
+              ),
+              borderRadius: BorderRadius.circular(12),
+              color: Colors.pink,
+            ),
             padding: EdgeInsets.all(5.0),
             child: Row(
               mainAxisSize: MainAxisSize.max,
@@ -337,7 +344,6 @@ class _HomePageState extends State {
                       fontSize: 17.0,
                     ),
                   ),
-
                 ),
                 RawMaterialButton(
                   padding: EdgeInsets.all(5.0),

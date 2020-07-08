@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
-class ThemeModel
-{
+class ThemeModel {
   final darkTheme = ThemeData(
     primarySwatch: Colors.grey,
     primaryColor: Colors.black,
