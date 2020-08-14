@@ -213,14 +213,16 @@ class _HomePageState extends State {
 
   void prepareApp() {
     if (socketUrl.isEmpty) {
-      http.get('https://support.edi.az/geo.php').then((value) {
-        if (value.statusCode == 200) {
-          setState(() {
-            socketUrl = value.body;
-          });
-          initBaseServices();
-        }
-      });
+      
+      print('error: map service socket url is empty');
+//       http.get('https://get_socket_url').then((value) {
+//         if (value.statusCode == 200) {
+//           setState(() {
+//             socketUrl = value.body;
+//           });
+//           initBaseServices();
+//         }
+//       });
     } else {
       initBaseServices();
     }
