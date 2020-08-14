@@ -1,4 +1,4 @@
-# geolocation
+# map-service-app
 
 A new Flutter application.
 
